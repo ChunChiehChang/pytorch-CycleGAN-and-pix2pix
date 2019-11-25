@@ -1,3 +1,4 @@
+import pudb
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -203,9 +204,36 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
+def define_CTC(embedding_size, phone_size, hidden_size=256, num_layers=2, init_gain=0.02, gpu_ids=[]):
+    """Create a E2E model to apply CTC loss to GANs
+    """
+    net = ConvRNNCTC(embedding_size, phone_size, hidden_size, num_layers)
+    return init_net(net, 'normal', init_gain, gpu_ids)
+
+
 ##############################################################################
 # Classes
 ##############################################################################
+class ConvRNNCTC(nn.Module):
+    """Defines Conv+LSTM+CTC network for adding CTC loss to gans"""
+
+    def __init__(self, embedding_size, phone_size, hidden_size, num_layers):
+        """Contruct CTC model
+        """
+        super(ConvRNNCTC, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.RNN = nn.LSTM(embedding_size, hidden_size, num_layers)
+        self.LINEAR = nn.Linear(hidden_size, phone_size)
+        self.SOFTMAX = nn.LogSoftmax(dim=2)
+
+    def forward(self, input):
+        input = input.view(-1, input.shape[3], input.shape[2])
+        out, _ = self.RNN(input)
+        out = self.LINEAR(out)
+        return self.SOFTMAX(out)
+
+
 class GANLoss(nn.Module):
     """Define different GAN objectives.
 

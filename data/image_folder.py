@@ -9,6 +9,8 @@ import torch.utils.data as data
 from PIL import Image
 import os
 import os.path
+import re
+import unicodedata
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -29,6 +31,33 @@ def make_dataset(dir, max_dataset_size=float("inf")):
             if is_image_file(fname):
                 path = os.path.join(root, fname)
                 images.append(path)
+    return images[:min(max_dataset_size, len(images))]
+
+
+def make_dataset_ctc(dir, lang, max_dataset_size=float("inf")):
+    images = []
+    assert os.path.isdir(dir), '%s is not a valid directory' % dir
+
+    phones = {}
+    count = 0
+    with open(os.path.join(lang, 'local', 'dict', 'phones.txt')) as f:
+        for line in f:
+            line = unicodedata.normalize('NFKC', line)
+            phones[line.strip()] = count
+            count = count + 1
+    phones['NULL'] = count
+
+    pattern = '|'.join(sorted(re.escape(k) for k in phones))
+    with open(os.path.join(dir, 'text')) as f:
+        for line in f:
+            line = unicodedata.normalize('NFKC', line)
+            line_vect = line.split(' ')
+            path = os.path.join(dir, 'images', line_vect[0] + '.png')
+            text = ' '.join(line_vect[1:])
+            text = re.sub(pattern, lambda x: str(phones.get(x.group(0))), text)
+            text = text.replace(' ', '')
+            text_vect = [int(x) if x.isnumeric() else phones['NULL'] for x in list(text)]
+            images.append([text_vect, path])
     return images[:min(max_dataset_size, len(images))]
 
 
