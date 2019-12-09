@@ -44,8 +44,8 @@ class CycleGANCTCModel(BaseModel):
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--alpha_A', type=float, default=1, help='weight for CTC loss')
             parser.add_argument('--alpha_B', type=float, default=1, help='weight for CTC loss')
-            parser.add_argument('--ctc_embedding_size', type=int, help='Embedding size for RNN')
-            parser.add_argument('--ctc_phone_size', type=int, help='Number of Phones')
+            parser.add_argument('--ctc_embedding_size', type=int, default=60, help='Embedding size for RNN')
+            parser.add_argument('--ctc_phone_size', type=int, default=3480, help='Number of Phones')
             parser.add_argument('--ctc_hidden_size', type=int, default=512, help='hidden state dimensions')
             parser.add_argument('--ctc_num_layers', type=int, default=3, help='number of RNN layers')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
@@ -132,7 +132,9 @@ class CycleGANCTCModel(BaseModel):
         #TODO Add image length
         self.A_len = input['A_len' if AtoB else 'B_len']
         self.B_len = input['B_len' if AtoB else 'A_len']
-        self.ctc_phone_size = torch.tensor(self.opt.ctc_phone_size).to(self.device)
+
+        if self.isTrain:
+            self.ctc_phone_size = torch.tensor(self.opt.ctc_phone_size).to(self.device)
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -146,8 +148,9 @@ class CycleGANCTCModel(BaseModel):
         # Real
         ctc_real = self.criterionCTC(netCTC(real).permute(1,0,2), self.text_A, self.A_len, torch.tensor(len(self.text_A)))
         # Fake
-        ctc_fake = self.criterionCTC(netCTC(fake).permute(1,0,2), self.text_A, self.A_len, torch.tensor(len(self.text_A)))
-        loss_CTC = (ctc_real + ctc_fake) * 0.5
+        #ctc_fake = self.criterionCTC(netCTC(fake).permute(1,0,2), self.text_A, self.A_len, torch.tensor(len(self.text_A)))
+        #loss_CTC = (ctc_real + ctc_fake) * 0.5
+        loss_CTC = ctc_real
         loss_CTC.backward()
         return loss_CTC
 
